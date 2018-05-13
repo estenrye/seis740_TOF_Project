@@ -79,6 +79,7 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len);
 PRIVATE void vPutChar(unsigned char c);
+PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -334,6 +335,7 @@ PUBLIC void AppColdStart(void)
 					vPrintf("\nDistance (ToF): %icm, Distance (RSSI): %dcm",
 							i32TofDistance,
 							u32RssiDistance);
+					tx_Distance(i32TofDistance, u32RssiDistance);
 				}
 				else
 				{

@@ -431,6 +431,15 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
  ****************************************************************************/
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len)
 {
+    switch(pu8Data[0])
+    {
+        case 0xd1:
+            vPrintf("Distance Transmission Received.");
+            break;
+        default:
+            vPrintf("Unexpected data packet.");
+            break;
+    }
 }
 
 /****************************************************************************
