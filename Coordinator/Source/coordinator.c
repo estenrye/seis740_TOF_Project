@@ -21,6 +21,8 @@
  * Copyright Jennic Ltd 2009. All rights reserved
  ****************************************************************************/
 
+#define UART                    E_AHI_UART_0
+
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
@@ -31,8 +33,10 @@
 #include <mac_pib.h>
 #include <AppApiTof.h>
 #include <LedControl.h>
-
+#include "LcdDriver.h"
 #include "config.h"
+#include "Printf.h"
+
 //#include "gdb.h"  // not reqd for x47 build
 
 
@@ -53,6 +57,7 @@ typedef enum
 /* Data type for storing data related to all end devices that have associated */
 typedef struct
 {
+    bool_t bIsAssociated;
     uint16 u16ShortAdr;
     uint32 u32ExtAdrL;
     uint32 u32ExtAdrH;
@@ -87,6 +92,10 @@ PRIVATE void vHandleEnergyScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd);
 PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len);
+PRIVATE void vPutChar(unsigned char c);
+
+PRIVATE void lcd_BuildStatusScreen(void);
+PRIVATE void lcd_UpdateStatusScreen(void);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -126,12 +135,15 @@ PUBLIC void AppColdStart(void)
     vAHI_WatchdogStop();
 #endif
 
-    vAHI_UartEnable(0);
-    vAHI_UartReset(0, TRUE, TRUE);
-    vAHI_UartSetClockDivisor(0, E_AHI_UART_RATE_38400);
-    vAHI_UartReset(0, FALSE, FALSE);
+    vAHI_UartEnable(UART);
+    vAHI_UartReset(UART, TRUE, TRUE);
+    vAHI_UartSetClockDivisor(UART, E_AHI_UART_RATE_38400);
+    vAHI_UartReset(UART, FALSE, FALSE);
 
     vInitSystem();
+    vInitPrintf((void *)vPutChar);
+    vLcdResetDefault();
+    lcd_BuildStatusScreen();
 
     //Enable TOF ranging.
     vAppApiTofInit(TRUE);
@@ -145,6 +157,7 @@ PUBLIC void AppColdStart(void)
         for(n=0;n<1000000;n++);
         bLedState = !bLedState;
         vLedControl(0, bLedState);
+        lcd_BuildStatusScreen();
         vProcessEventQueues();
     }
 }
@@ -187,13 +200,19 @@ PRIVATE void vInitSystem(void)
     (void)u32AHI_Init();
 
 	/* Enable high power modules */
-	vAHI_HighPowerModuleEnable(TRUE, TRUE);
+	//vAHI_HighPowerModuleEnable(TRUE, TRUE);
 
     /* Initialise coordinator state */
     sCoordinatorData.eState = E_STATE_IDLE;
     sCoordinatorData.u8TxPacketSeqNb  = 0;
     sCoordinatorData.u8RxPacketSeqNb  = 0;
     sCoordinatorData.u16NbrEndDevices = 0;
+
+    int i;
+    for (i=0; i<MAX_END_DEVICES; i++)
+    {
+        sCoordinatorData.sEndDeviceData[i].bIsAssociated = FALSE;
+    }
 
     /* Set up the MAC handles. Must be called AFTER u32AppQApiInit() */
     s_pvMac = pvAppApiGetMacHandle();
@@ -472,7 +491,8 @@ PRIVATE void vHandleNodeAssociation(MAC_MlmeDcfmInd_s *psMlmeInd)
 
         sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32ExtAdrH  =
         psMlmeInd->uParam.sIndAssociate.sDeviceAddr.u32H;
-
+        sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].bIsAssociated = TRUE;
+        vPrintf("Beacon %u Associated: %u\n", u16EndDeviceIndex, u16ShortAdr);
         sCoordinatorData.u16NbrEndDevices++;
 
         sMlmeReqRsp.uParam.sRspAssociate.u8Status = 0; /* Access granted */
@@ -606,6 +626,72 @@ PRIVATE void vStartCoordinator(void)
     sMlmeReqRsp.uParam.sReqStart.u8SecurityEnable = FALSE;
 
     vAppApiMlmeRequest(&sMlmeReqRsp, &sMlmeSyncCfm);
+}
+
+PRIVATE void lcd_BuildStatusScreen(void)
+{
+    vPrintf("lcd_BuildStatusScreen\n");
+    vLcdClear();
+    vLcdWriteText("Esten Rye", 0, 0);
+    vLcdWriteTextRightJustified("SEIS 740", 0, 127);
+    vLcdWriteText("TOF Triangulation", 1, 0);
+    vLcdWriteText("Node 0:", 2, 0);
+    vLcdWriteTextRightJustified("Off", 2, 60);
+    vLcdWriteText("Node 1:", 2, 64);
+    vLcdWriteTextRightJustified("Off", 2, 123);
+    vLcdWriteText("A:", 3, 0);
+    vLcdWriteText("B:", 4, 0);
+    vLcdWriteText("C:", 5, 0);
+    vLcdWriteText("X:", 6, 0);
+    vLcdWriteText("Y:", 7, 0);
+    lcd_UpdateStatusScreen();
+}
+
+PRIVATE void lcd_UpdateStatusScreen(void)
+{
+    vPrintf("lcd_UpdateStatusScreen\n");
+    int i;
+    bool_t beacon0Assigned = sCoordinatorData.sEndDeviceData[0].bIsAssociated;
+    bool_t beacon1Assigned = sCoordinatorData.sEndDeviceData[1].bIsAssociated;
+
+    vPrintf("Beacon 0 Associated: %i\n", beacon0Assigned);
+    if (beacon0Assigned)
+    {
+        vLcdWriteTextRightJustified(" On", 2, 60);
+    }
+    else
+    {
+        vLcdWriteTextRightJustified("Off", 2, 60);
+    }
+
+    vPrintf("Beacon 1 Associated: %i\n", beacon1Assigned);
+    if (beacon1Assigned)
+    {
+        vLcdWriteTextRightJustified(" On", 2, 123);
+    }
+    else
+    {
+        vLcdWriteTextRightJustified("Off", 2, 123);
+    }
+
+    // char output[20];
+    // dtoa(sDemoData.sState.dDistanceA, output, 4);
+    // vLcdWriteTextRightJustified(output, 3, 127);
+    // dtoa(sDemoData.sState.dDistanceB, output, 4);
+    // vLcdWriteTextRightJustified(output, 4, 127);
+    // dtoa(sDemoData.sState.dDistanceC, output, 4);
+    // vLcdWriteTextRightJustified(output, 5, 127);
+    // dtoa(sDemoData.sState.dXpos, output, 4);
+    // vLcdWriteTextRightJustified(output, 6, 127);
+    // dtoa(sDemoData.sState.dYpos, output, 4);
+    // vLcdWriteTextRightJustified(output, 7, 127);
+    vLcdRefreshAll();
+}
+
+PRIVATE void vPutChar(unsigned char c) {
+	while ((u8AHI_UartReadLineStatus(UART) & E_AHI_UART_LS_THRE) == 0);
+	vAHI_UartWriteData(UART, c);
+    while ((u8AHI_UartReadLineStatus(UART) & (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT)) != (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT));
 }
 
 /****************************************************************************/
