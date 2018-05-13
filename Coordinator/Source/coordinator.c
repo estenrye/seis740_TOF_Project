@@ -22,7 +22,8 @@
  ****************************************************************************/
 
 #define UART                    E_AHI_UART_0
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define CACHED_AVERAGES         10
+#define BYTE_TO_BINARY_PATTERN  "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
   (byte & 0x80 ? '1' : '0'), \
   (byte & 0x40 ? '1' : '0'), \
@@ -46,6 +47,7 @@
 #include "LcdDriver.h"
 #include "config.h"
 #include "Printf.h"
+#include <math.h>
 
 //#include "gdb.h"  // not reqd for x47 build
 
@@ -68,9 +70,13 @@ typedef enum
 typedef struct
 {
     bool_t bIsAssociated;
+    int32 i32TofDistance;
+    uint32 u32RssiDistance;
     uint16 u16ShortAdr;
     uint32 u32ExtAdrL;
     uint32 u32ExtAdrH;
+    uint8   u8TxPacketSeqNb;
+    uint8   u8RxPacketSeqNb;
 }tsEndDeviceData;
 
 typedef struct
@@ -78,13 +84,10 @@ typedef struct
     /* Data related to associated end devices */
     uint16          u16NbrEndDevices;
     tsEndDeviceData sEndDeviceData[MAX_END_DEVICES];
-
     teState eState;
-
     uint8   u8Channel;
-    uint8   u8TxPacketSeqNb;
-    uint8   u8RxPacketSeqNb;
-
+    double x;
+    double y;
 }tsCoordinatorData;
 
 /****************************************************************************/
@@ -103,10 +106,14 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16Address);
 PRIVATE void vPutChar(unsigned char c);
+PRIVATE void reverse(char *str, int len);
+PRIVATE int intToStr(uint32 x, char str[], int d);
 
+PRIVATE uint32 GetDistance(uint16 iEndDevice);
 PRIVATE void lcd_BuildStatusScreen(void);
 PRIVATE void lcd_UpdateStatusScreen(void);
 PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 u8Len, uint16 u16Address);
+PRIVATE void task_CalculateXYPos(void);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -170,6 +177,7 @@ PUBLIC void AppColdStart(void)
         vLedControl(0, bLedState);
         lcd_BuildStatusScreen();
         vProcessEventQueues();
+        task_CalculateXYPos();
     }
 }
 
@@ -215,14 +223,16 @@ PRIVATE void vInitSystem(void)
 
     /* Initialise coordinator state */
     sCoordinatorData.eState = E_STATE_IDLE;
-    sCoordinatorData.u8TxPacketSeqNb  = 0;
-    sCoordinatorData.u8RxPacketSeqNb  = 0;
     sCoordinatorData.u16NbrEndDevices = 0;
 
     int i;
     for (i=0; i<MAX_END_DEVICES; i++)
     {
         sCoordinatorData.sEndDeviceData[i].bIsAssociated = FALSE;
+        sCoordinatorData.sEndDeviceData[i].i32TofDistance = 0;
+        sCoordinatorData.sEndDeviceData[i].u32RssiDistance = 0;
+        sCoordinatorData.sEndDeviceData[i].u8RxPacketSeqNb = 0;
+        sCoordinatorData.sEndDeviceData[i].u8TxPacketSeqNb = 0;
     }
 
     /* Set up the MAC handles. Must be called AFTER u32AppQApiInit() */
@@ -420,9 +430,10 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
     /* Check application layer sequence number of frame and reject if it is
        the same as the last frame, i.e. same frame has been received more
        than once. */
-    if (psFrame->au8Sdu[0] >= sCoordinatorData.u8RxPacketSeqNb)
+    uint16 u16EndDeviceIndex = psFrame->sSrcAddr.uAddr.u16Short - 1;
+    if (psFrame->au8Sdu[0] >= sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u8RxPacketSeqNb)
     {
-        sCoordinatorData.u8RxPacketSeqNb++;
+        sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u8RxPacketSeqNb++;
 
         vProcessReceivedDataPacket(&psFrame->au8Sdu[1],
                                    (psFrame->u8SduLength) - 1,
@@ -462,32 +473,34 @@ PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16A
 PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 u8Len, uint16 u16Address)
 {
     vPrintf("\nDistance Transmission Received From Beacon %i.\n", u16Address);
+    #ifdef DEBUG_DISTANCE_TRANSMISSION
+        vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[0]));
+        vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[1]));
+        vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[2]));
+        vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[3]));
+        vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[4]));
+        vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[5]));
+        vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[6]));
+        vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[7]));
+    #endif
 
     uint32 highByte = ((uint32)pu8Data[0]) << 24;
     uint32 midHighByte = ((uint32)pu8Data[1]) << 16;
     uint32 midLowByte = ((uint32)pu8Data[2]) << 8;
     uint32 lowByte = ((uint32)pu8Data[3]);
 
-    vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[0]));
-    vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[1]));
-    vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[2]));
-    vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[3]));
-    vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[4]));
-    vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[5]));
-    vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[6]));
-    vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[7]));
-
-    int32 i32TofDistance = ((int32)highByte) | midHighByte | midLowByte | lowByte;
+    uint16 u16EndDeviceIndex = u16Address - 1;
+    sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].i32TofDistance = ((int32)highByte) | midHighByte | midLowByte | lowByte;
 
     highByte = ((uint32)pu8Data[4]) << 24;
     midHighByte = ((uint32)pu8Data[5]) << 16;
     midLowByte = ((uint32)pu8Data[6]) << 8;
     lowByte = ((uint32)pu8Data[7]);
 
-    uint32 u32RssiDistance = highByte | midHighByte | midLowByte | lowByte;
+    sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32RssiDistance = highByte | midHighByte | midLowByte | lowByte;
 
-    vPrintf("TOF Distance: %i cm", i32TofDistance);
-    vPrintf("RSSI Distance: %i cm", u32RssiDistance);
+    vPrintf("TOF Distance: %i cm", sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].i32TofDistance);
+    vPrintf("RSSI Distance: %i cm", sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32RssiDistance);
 }
 
 /****************************************************************************
@@ -549,7 +562,7 @@ PRIVATE void vHandleNodeAssociation(MAC_MlmeDcfmInd_s *psMlmeInd)
         sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32ExtAdrH  =
         psMlmeInd->uParam.sIndAssociate.sDeviceAddr.u32H;
         sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].bIsAssociated = TRUE;
-        vPrintf("Beacon %u Associated: %u\n", u16EndDeviceIndex, u16ShortAdr);
+        vPrintf("Beacon %i Associated: %i\n", u16EndDeviceIndex, u16ShortAdr);
         sCoordinatorData.u16NbrEndDevices++;
 
         sMlmeReqRsp.uParam.sRspAssociate.u8Status = 0; /* Access granted */
@@ -706,12 +719,26 @@ PRIVATE void lcd_BuildStatusScreen(void)
     lcd_UpdateStatusScreen();
 }
 
+PRIVATE uint32 GetDistance(uint16 iEndDevice)
+{
+    uint32 distance;
+    if (sCoordinatorData.sEndDeviceData[iEndDevice].i32TofDistance < 500)
+    
+    {
+        distance = sCoordinatorData.sEndDeviceData[iEndDevice].u32RssiDistance;
+    }
+    else
+    {
+        distance = sCoordinatorData.sEndDeviceData[iEndDevice].i32TofDistance;
+    }
+    return distance;
+}
+
 PRIVATE void lcd_UpdateStatusScreen(void)
 {
     #ifdef DEBUG_LCD
         vPrintf("lcd_UpdateStatusScreen\n");
     #endif
-    int i;
     bool_t beacon0Assigned = sCoordinatorData.sEndDeviceData[0].bIsAssociated;
     bool_t beacon1Assigned = sCoordinatorData.sEndDeviceData[1].bIsAssociated;
 
@@ -738,17 +765,17 @@ PRIVATE void lcd_UpdateStatusScreen(void)
         vLcdWriteTextRightJustified("Off", 2, 123);
     }
 
-    // char output[20];
-    // dtoa(sDemoData.sState.dDistanceA, output, 4);
-    // vLcdWriteTextRightJustified(output, 3, 127);
-    // dtoa(sDemoData.sState.dDistanceB, output, 4);
-    // vLcdWriteTextRightJustified(output, 4, 127);
-    // dtoa(sDemoData.sState.dDistanceC, output, 4);
-    // vLcdWriteTextRightJustified(output, 5, 127);
-    // dtoa(sDemoData.sState.dXpos, output, 4);
-    // vLcdWriteTextRightJustified(output, 6, 127);
-    // dtoa(sDemoData.sState.dYpos, output, 4);
-    // vLcdWriteTextRightJustified(output, 7, 127);
+    char output[20];
+    
+    intToStr(GetDistance(0), output, 0);
+    vLcdWriteTextRightJustified(output, 3, 127);
+    intToStr(GetDistance(1), output, 0);
+    vLcdWriteTextRightJustified(output, 4, 127);
+    vLcdWriteTextRightJustified("120", 5, 127);
+    intToStr((int)sCoordinatorData.x, output, 0);
+    vLcdWriteTextRightJustified(output, 6, 127);
+    intToStr((int)sCoordinatorData.y, output, 0);
+    vLcdWriteTextRightJustified(output, 7, 127);
     vLcdRefreshAll();
 }
 
@@ -758,6 +785,63 @@ PRIVATE void vPutChar(unsigned char c) {
     while ((u8AHI_UartReadLineStatus(UART) & (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT)) != (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT));
 }
 
+// reverses a string 'str' of length 'len'
+// retrieved from: https://www.geeksforgeeks.org/convert-floating-point-number-string/
+void reverse(char *str, int len)
+{
+    int i=0, j=len-1, temp;
+    while (i<j)
+    {
+        temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++; j--;
+    }
+}
+ 
+ // Converts a given integer x to string str[].  d is the number
+ // of digits required in output. If d is more than the number
+ // of digits in x, then 0s are added at the beginning.
+ // retrieved from https://www.geeksforgeeks.org/convert-floating-point-number-string/
+ // modified to support uint32 numbers.
+int intToStr(uint32 x, char str[], int d)
+{
+    int i = 0;
+    while (x)
+    {
+        str[i++] = (x%10) + '0';
+        x = x/10;
+    }
+ 
+    // If number of digits required is more, then
+    // add 0s at the beginning
+    while (i < d)
+    {
+        str[i++] = '0';
+    }
+    
+    reverse(str, i);
+    str[i] = '\0';
+    return i;
+}
+
+PRIVATE void task_CalculateXYPos(void)
+{
+    int32 a = (int32)GetDistance(0);
+    int32 b = (int32)GetDistance(1);
+    int32 c = (int32)120;
+    vPrintf("Calculate XY Position\nA: %i\nB: %i\nC: %i\n", a, b, c);
+    if (a > 0 && b > 0)
+    {
+        int32 s = (a + b + c) / 2;
+        int32 n = s * (s-a) * (s-b) * (s-c);
+        double y = 2 * sqrt(n) / c;
+        double x = sqrt(pow(a, 2) - pow(y, 2));
+        vPrintf("N: %i\nS: %i\nX: %i\nY: %i\n", n, s, (int)x, (int)y);
+        sCoordinatorData.y = y;
+        sCoordinatorData.x = x;
+    }
+}
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/

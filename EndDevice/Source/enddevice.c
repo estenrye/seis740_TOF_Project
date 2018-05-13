@@ -50,7 +50,7 @@
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
 
-#define MAX_READINGS     10
+#define MAX_READINGS     20
 #define UART             E_AHI_UART_0
 
 /****************************************************************************/
@@ -221,38 +221,13 @@ PUBLIC void AppColdStart(void)
 		{
 			if(bTofInProgress==FALSE)
 			{
-				/* Check for data in receive FIFO */
-				if ((u8AHI_UartReadLineStatus(UART) & E_AHI_UART_LS_DR  ) != 0)
+				if (bAppApiGetTof( asTofData, &sAddr, MAX_READINGS, API_TOF_FORWARDS, vTofCallback))
 				{
-					uint8 u8RxChar = u8AHI_UartReadData(UART);
-
-					switch (u8RxChar) {
-					case 'R':
-					case 'r':
-						vPrintf("\n\n");
-						if (bAppApiGetTof( asTofData, &sAddr, MAX_READINGS, API_TOF_REVERSE, vTofCallback))
-						{
-							vPrintf("\nReverse burst started");
-							bTofInProgress = TRUE;
-							bTofDirection = API_TOF_REVERSE;
-						} else {
-							vPrintf("\nFailed to start ToF");
-						}
-						break;
-
-					case 'F':
-					case 'f':
-						vPrintf("\n\n");
-						if (bAppApiGetTof( asTofData, &sAddr, MAX_READINGS, API_TOF_FORWARDS, vTofCallback))
-						{
-							vPrintf("\nForward burst started");
-							bTofInProgress = TRUE;
-							bTofDirection = API_TOF_FORWARDS;
-						} else {
-							vPrintf("\nFailed to start ToF");
-						}
-						break;
-					}
+					vPrintf("\nForward burst started");
+					bTofInProgress = TRUE;
+					bTofDirection = API_TOF_FORWARDS;
+				} else {
+					vPrintf("\nFailed to start ToF");
 				}
 			}
 
@@ -852,7 +827,6 @@ PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
 	sMcpsReqRsp.uParam.sReqData.sFrame.u8SduLength = 10;
 	pu8Payload = sMcpsReqRsp.uParam.sReqData.sFrame.au8Sdu;
 	vPrintf("\nTransmitting Distance to Coordinator\n");
-	vPrintf("First byte: %i\n", (uint8)(0xd1));
 
 	pu8Payload[0] = sEndDeviceData.u8TxPacketSeqNb++;
 	pu8Payload[1] = (uint8)(0xd1);
@@ -865,14 +839,16 @@ PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
 	pu8Payload[8] = (uint8)((u32RssiDistance & 0x0000ff00uL) >> 8);
 	pu8Payload[9] = (uint8)(u32RssiDistance & 0x000000ffuL);
 
-    vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[2]));
-    vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[3]));
-    vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[4]));
-    vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[5]));
-    vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[6]));
-    vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[7]));
-    vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[8]));
-    vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[9]));
+	#ifdef DEBUG_DISTANCE_TRANSMISSION
+		vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[2]));
+		vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[3]));
+		vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[4]));
+		vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[5]));
+		vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[6]));
+		vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[7]));
+		vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[8]));
+		vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[9]));
+	#endif
 
 	vAppApiMcpsRequest(&sMcpsReqRsp, &sMcpsSyncCfm);
 }

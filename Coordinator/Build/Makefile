@@ -107,6 +107,8 @@ INCFLAGS += -I$(COMPONENTS_BASE_DIR)/AppQueueApi/Include
 
 APPLIBS += TOF 
 
+LDLIBS += m
+
 ###############################################################################
 
 # You should not need to edit below this line
