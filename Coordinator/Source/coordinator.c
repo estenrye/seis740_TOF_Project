@@ -22,6 +22,16 @@
  ****************************************************************************/
 
 #define UART                    E_AHI_UART_0
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 
 /****************************************************************************/
 /***        Include files                                                 ***/
@@ -91,11 +101,12 @@ PRIVATE void vHandleNodeAssociation(MAC_MlmeDcfmInd_s *psMlmeInd);
 PRIVATE void vHandleEnergyScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd);
 PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd);
-PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len);
+PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16Address);
 PRIVATE void vPutChar(unsigned char c);
 
 PRIVATE void lcd_BuildStatusScreen(void);
 PRIVATE void lcd_UpdateStatusScreen(void);
+PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 u8Len, uint16 u16Address);
 
 /****************************************************************************/
 /***        Exported Variables                                            ***/
@@ -414,7 +425,8 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
         sCoordinatorData.u8RxPacketSeqNb++;
 
         vProcessReceivedDataPacket(&psFrame->au8Sdu[1],
-                                   (psFrame->u8SduLength) - 1);
+                                   (psFrame->u8SduLength) - 1,
+                                   psFrame->sSrcAddr.uAddr.u16Short);
     }
 }
 /****************************************************************************
@@ -429,24 +441,53 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
  *
  * NOTES:
  ****************************************************************************/
-PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len)
+PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16Address)
 {
     vPrintf("\nReceived data Packet %i long\n", u8Len);
     if (u8Len >= 1)
     {
         uint8 firstByte = pu8Data[0];
-        vPrintf("First byte: %i\n", firstByte);
-        vPrintf("0xd1: %i\n", 0xd1);
         switch(firstByte)
         {
             case 0xd1:
-                vPrintf("Distance Transmission Received.\n");
+                interrupt_handleDistanceTransmissionReceived(&pu8Data[1], u8Len-1, u16Address);
                 break;
             default:
                 vPrintf("Unexpected data packet.\n");
                 break;
         }
     }
+}
+
+PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 u8Len, uint16 u16Address)
+{
+    vPrintf("\nDistance Transmission Received From Beacon %i.\n", u16Address);
+
+    uint32 highByte = ((uint32)pu8Data[0]) << 24;
+    uint32 midHighByte = ((uint32)pu8Data[1]) << 16;
+    uint32 midLowByte = ((uint32)pu8Data[2]) << 8;
+    uint32 lowByte = ((uint32)pu8Data[3]);
+
+    vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[0]));
+    vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[1]));
+    vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[2]));
+    vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[3]));
+    vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[4]));
+    vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[5]));
+    vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[6]));
+    vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Data[7]));
+
+    int32 i32TofDistance = ((int32)highByte) | midHighByte | midLowByte | lowByte;
+
+    highByte = ((uint32)pu8Data[4]) << 24;
+    midHighByte = ((uint32)pu8Data[5]) << 16;
+    midLowByte = ((uint32)pu8Data[6]) << 8;
+    lowByte = ((uint32)pu8Data[7]);
+
+    uint32 u32RssiDistance = highByte | midHighByte | midLowByte | lowByte;
+
+    vPrintf("TOF Distance: %i cm", i32TofDistance);
+    vPrintf("RSSI Distance: %i cm", u32RssiDistance);
 }
 
 /****************************************************************************

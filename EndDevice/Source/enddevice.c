@@ -20,6 +20,16 @@
  *
  * Copyright Jennic Ltd 2009. All rights reserved
  ****************************************************************************/
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 
 /****************************************************************************/
 /***        Include files                                                 ***/
@@ -846,14 +856,23 @@ PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
 
 	pu8Payload[0] = sEndDeviceData.u8TxPacketSeqNb++;
 	pu8Payload[1] = (uint8)(0xd1);
-	pu8Payload[2] = (uint8)(i32TofDistance  & 0xff000000 >> 24);
-	pu8Payload[3] = (uint8)(i32TofDistance  & 0x00ff0000 >> 16);
-	pu8Payload[4] = (uint8)(i32TofDistance  & 0x0000ff00 >> 8);
-	pu8Payload[5] = (uint8)(i32TofDistance  & 0x000000ff);
-	pu8Payload[6] = (uint8)(u32RssiDistance & 0xff000000 >> 24);
-	pu8Payload[7] = (uint8)(u32RssiDistance & 0x00ff0000 >> 16);
-	pu8Payload[8] = (uint8)(u32RssiDistance & 0x0000ff00 >> 8);
-	pu8Payload[9] = (uint8)(u32RssiDistance & 0x000000ff);
+	pu8Payload[2] = (uint8)(((uint32)i32TofDistance & 0xff000000uL) >> 24);
+	pu8Payload[3] = (uint8)(((uint32)i32TofDistance & 0x00ff0000uL) >> 16);
+	pu8Payload[4] = (uint8)(((uint32)i32TofDistance & 0x0000ff00uL) >> 8);
+	pu8Payload[5] = (uint8)((uint32)i32TofDistance & 0x000000ffuL);
+	pu8Payload[6] = (uint8)((u32RssiDistance & 0xff000000uL) >> 24);
+	pu8Payload[7] = (uint8)((u32RssiDistance & 0x00ff0000uL) >> 16);
+	pu8Payload[8] = (uint8)((u32RssiDistance & 0x0000ff00uL) >> 8);
+	pu8Payload[9] = (uint8)(u32RssiDistance & 0x000000ffuL);
+
+    vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[2]));
+    vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[3]));
+    vPrintf("TOF  Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[4]));
+    vPrintf("TOF  Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[5]));
+    vPrintf("RSSI Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[6]));
+    vPrintf("RSSI Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[7]));
+    vPrintf("RSSI Byte2: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Payload[8]));
+    vPrintf("RSSI Byte3: "BYTE_TO_BINARY_PATTERN"\n\n", BYTE_TO_BINARY(pu8Payload[9]));
 
 	vAppApiMcpsRequest(&sMcpsReqRsp, &sMcpsSyncCfm);
 }
