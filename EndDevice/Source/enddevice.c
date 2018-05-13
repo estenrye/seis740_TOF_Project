@@ -94,6 +94,7 @@ PRIVATE tsEndDeviceData sEndDeviceData;
 
 PRIVATE bool_t bLedState;
 PRIVATE uint32 u32Tick = 0;
+PRIVATE uint8 u8CurrentTxHandle = 0x00;
 
 eTofReturn eTofStatus = -1;
 volatile bool_t bTofInProgress = FALSE;
@@ -169,7 +170,7 @@ PUBLIC void AppColdStart(void)
 	vPrintf("\x1B[2J\x1B[H\x1B[3g");
 	vPrintf("JN5148 Time of Flight Ranging Demo\n");
 
-	for(n = 0; n < 255; n++)
+	for(n = 0; n < MAX_READINGS; n++)
 	{
 		asTofData[n].s32Tof       = 0;
 		asTofData[n].s8LocalRSSI  = 0;
@@ -807,7 +808,49 @@ PRIVATE void vPutChar(unsigned char c) {
 }
 
 
+PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
+{
+	/* Structures used to hold data for MLME request and response */
+	MAC_McpsReqRsp_s sMcpsReqRsp;
+	MAC_McpsSyncCfm_s sMcpsSyncCfm;
+	uint8 *pu8Payload;
 
+	/* Create frame transmission request */
+	sMcpsReqRsp.u8Type = MAC_MCPS_REQ_DATA;
+	sMcpsReqRsp.u8ParamLength = sizeof(MAC_McpsReqData_s);
+
+	/* Set handle so we can match confirmation to request */
+	sMcpsReqRsp.uParam.sReqData.u8Handle = u8CurrentTxHandle;
+	u8CurrentTxHandle +=1;
+
+	/* Use short address for source */
+	sMcpsReqRsp.uParam.sReqData.sFrame.sSrcAddr.u8AddrMode = 2;
+	sMcpsReqRsp.uParam.sReqData.sFrame.sSrcAddr.u16PanId = PAN_ID;
+	sMcpsReqRsp.uParam.sReqData.sFrame.sSrcAddr.uAddr.u16Short = sEndDeviceData.u16Address;
+
+	/* Use short address for destination */
+	sMcpsReqRsp.uParam.sReqData.sFrame.sDstAddr.u8AddrMode = 2;
+	sMcpsReqRsp.uParam.sReqData.sFrame.sDstAddr.u16PanId = PAN_ID;
+	sMcpsReqRsp.uParam.sReqData.sFrame.sDstAddr.uAddr.u16Short = COORDINATOR_ADR;
+
+	/* Frame requires ack but not security, indirect transmit or GTS */
+	sMcpsReqRsp.uParam.sReqData.sFrame.u8TxOptions = MAC_TX_OPTION_ACK;
+
+	/* Set payload, only use first 8 bytes */
+	sMcpsReqRsp.uParam.sReqData.sFrame.u8SduLength = 9;
+	pu8Payload = sMcpsReqRsp.uParam.sReqData.sFrame.au8Sdu;
+	pu8Payload[0] = 0xd1;
+	pu8Payload[1] = i32TofDistance  & 0xff000000 >> 24;
+	pu8Payload[2] = i32TofDistance  & 0x00ff0000 >> 16;
+	pu8Payload[3] = i32TofDistance  & 0x0000ff00 >> 8;
+	pu8Payload[4] = i32TofDistance  & 0x000000ff;
+	pu8Payload[5] = u32RssiDistance & 0xff000000 >> 24;
+	pu8Payload[6] = u32RssiDistance & 0x00ff0000 >> 16;
+	pu8Payload[7] = u32RssiDistance & 0x0000ff00 >> 8;
+	pu8Payload[8] = u32RssiDistance & 0x000000ff;
+
+	vAppApiMcpsRequest(&sMcpsReqRsp, &sMcpsSyncCfm);
+}
 /****************************************************************************/
 /***        END OF FILE                                                   ***/
 /****************************************************************************/
