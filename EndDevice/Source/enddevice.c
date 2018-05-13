@@ -839,17 +839,21 @@ PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
 	sMcpsReqRsp.uParam.sReqData.sFrame.u8TxOptions = MAC_TX_OPTION_ACK;
 
 	/* Set payload, only use first 8 bytes */
-	sMcpsReqRsp.uParam.sReqData.sFrame.u8SduLength = 9;
+	sMcpsReqRsp.uParam.sReqData.sFrame.u8SduLength = 10;
 	pu8Payload = sMcpsReqRsp.uParam.sReqData.sFrame.au8Sdu;
-	pu8Payload[0] = 0xd1;
-	pu8Payload[1] = i32TofDistance  & 0xff000000 >> 24;
-	pu8Payload[2] = i32TofDistance  & 0x00ff0000 >> 16;
-	pu8Payload[3] = i32TofDistance  & 0x0000ff00 >> 8;
-	pu8Payload[4] = i32TofDistance  & 0x000000ff;
-	pu8Payload[5] = u32RssiDistance & 0xff000000 >> 24;
-	pu8Payload[6] = u32RssiDistance & 0x00ff0000 >> 16;
-	pu8Payload[7] = u32RssiDistance & 0x0000ff00 >> 8;
-	pu8Payload[8] = u32RssiDistance & 0x000000ff;
+	vPrintf("\nTransmitting Distance to Coordinator\n");
+	vPrintf("First byte: %i\n", (uint8)(0xd1));
+
+	pu8Payload[0] = sEndDeviceData.u8TxPacketSeqNb++;
+	pu8Payload[1] = (uint8)(0xd1);
+	pu8Payload[2] = (uint8)(i32TofDistance  & 0xff000000 >> 24);
+	pu8Payload[3] = (uint8)(i32TofDistance  & 0x00ff0000 >> 16);
+	pu8Payload[4] = (uint8)(i32TofDistance  & 0x0000ff00 >> 8);
+	pu8Payload[5] = (uint8)(i32TofDistance  & 0x000000ff);
+	pu8Payload[6] = (uint8)(u32RssiDistance & 0xff000000 >> 24);
+	pu8Payload[7] = (uint8)(u32RssiDistance & 0x00ff0000 >> 16);
+	pu8Payload[8] = (uint8)(u32RssiDistance & 0x0000ff00 >> 8);
+	pu8Payload[9] = (uint8)(u32RssiDistance & 0x000000ff);
 
 	vAppApiMcpsRequest(&sMcpsReqRsp, &sMcpsSyncCfm);
 }

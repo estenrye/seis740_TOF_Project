@@ -431,14 +431,21 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
  ****************************************************************************/
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len)
 {
-    switch(pu8Data[0])
+    vPrintf("\nReceived data Packet %i long\n", u8Len);
+    if (u8Len >= 1)
     {
-        case 0xd1:
-            vPrintf("Distance Transmission Received.");
-            break;
-        default:
-            vPrintf("Unexpected data packet.");
-            break;
+        uint8 firstByte = pu8Data[0];
+        vPrintf("First byte: %i\n", firstByte);
+        vPrintf("0xd1: %i\n", 0xd1);
+        switch(firstByte)
+        {
+            case 0xd1:
+                vPrintf("Distance Transmission Received.\n");
+                break;
+            default:
+                vPrintf("Unexpected data packet.\n");
+                break;
+        }
     }
 }
 
@@ -639,7 +646,9 @@ PRIVATE void vStartCoordinator(void)
 
 PRIVATE void lcd_BuildStatusScreen(void)
 {
-    vPrintf("lcd_BuildStatusScreen\n");
+    #ifdef DEBUG_LCD
+        vPrintf("lcd_BuildStatusScreen\n");
+    #endif
     vLcdClear();
     vLcdWriteText("Esten Rye", 0, 0);
     vLcdWriteTextRightJustified("SEIS 740", 0, 127);
@@ -658,12 +667,18 @@ PRIVATE void lcd_BuildStatusScreen(void)
 
 PRIVATE void lcd_UpdateStatusScreen(void)
 {
-    vPrintf("lcd_UpdateStatusScreen\n");
+    #ifdef DEBUG_LCD
+        vPrintf("lcd_UpdateStatusScreen\n");
+    #endif
     int i;
     bool_t beacon0Assigned = sCoordinatorData.sEndDeviceData[0].bIsAssociated;
     bool_t beacon1Assigned = sCoordinatorData.sEndDeviceData[1].bIsAssociated;
 
-    vPrintf("Beacon 0 Associated: %i\n", beacon0Assigned);
+    #ifdef DEBUG_LCD
+        vPrintf("Beacon 0 Associated: %i\n", beacon0Assigned);
+        vPrintf("Beacon 1 Associated: %i\n", beacon1Assigned);
+    #endif
+
     if (beacon0Assigned)
     {
         vLcdWriteTextRightJustified(" On", 2, 60);
@@ -673,7 +688,6 @@ PRIVATE void lcd_UpdateStatusScreen(void)
         vLcdWriteTextRightJustified("Off", 2, 60);
     }
 
-    vPrintf("Beacon 1 Associated: %i\n", beacon1Assigned);
     if (beacon1Assigned)
     {
         vLcdWriteTextRightJustified(" On", 2, 123);
