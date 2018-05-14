@@ -1,26 +1,3 @@
-/****************************************************************************
- * $Rev::               $: Revision of last commit
- * $Author::            $: Author of last commit
- * $Date::              $: Date of last commit
- * $HeadURL$
- ****************************************************************************
- * This software is owned by Jennic and/or its supplier and is protected
- * under applicable copyright laws. All rights are reserved. We grant You,
- * and any third parties, a license to use this software solely and
- * exclusively on Jennic products. You, and any third parties must reproduce
- * the copyright and warranty notice and any other legend of ownership on each
- * copy or partial copy of the software.
- *
- * THIS SOFTWARE IS PROVIDED "AS IS". JENNIC MAKES NO WARRANTIES, WHETHER
- * EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE,
- * ACCURACY OR LACK OF NEGLIGENCE. JENNIC SHALL NOT, IN ANY CIRCUMSTANCES,
- * BE LIABLE FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO, SPECIAL,
- * INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON WHATSOEVER.
- *
- * Copyright Jennic Ltd 2009. All rights reserved
- ****************************************************************************/
-
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
@@ -97,10 +74,6 @@ PRIVATE void task_CalculateDistance(void);
 PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance);
 
 /****************************************************************************/
-/***        Exported Variables                                            ***/
-/****************************************************************************/
-
-/****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
 /* Handles from the MAC */
@@ -162,6 +135,8 @@ void vTofCallback(eTofReturn eStatus)
  * RETURNS:
  * Never returns.
  *
+ * NOTES: Demo Application Boiler Plate
+ *        Modified to execute custom code.
  ****************************************************************************/
 PUBLIC void AppColdStart(void)
 {
@@ -179,7 +154,7 @@ PUBLIC void AppColdStart(void)
 
 	/* Clear screen and tabs */
 	vPrintf("\x1B[2J\x1B[H\x1B[3g");
-	vPrintf("JN5148 Time of Flight Ranging Demo\n");
+	vPrintf("Time of Flight Triangulation Demo\n");
 
 	for(n = 0; n < MAX_READINGS; n++)
 	{
@@ -253,6 +228,8 @@ PUBLIC void AppColdStart(void)
  * RETURNS:
  * Never returns.
  *
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PUBLIC void AppWarmStart(void)
 {
@@ -268,10 +245,13 @@ PUBLIC void AppWarmStart(void)
  * NAME: vInitSystem
  *
  * DESCRIPTION:
- *
+ *   Initializes hardware and device state data.
+ * 
  * RETURNS:
  * void
  *
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vInitSystem(void)
 {
@@ -300,8 +280,21 @@ PRIVATE void vInitSystem(void)
 	vPrintf("Done Init\n");
 }
 
+/****************************************************************************
+ *
+ * NAME: task_StartTof
+ *
+ * DESCRIPTION:
+ * Starts a TOF Forward Burst measurement that takes MAX_READINGS number of
+ * measurements.
+ *
+ * RETURNS: void
+ * 
+ ****************************************************************************/
 PRIVATE void task_StartTof(void)
 {
+	// Loop an obsurdly long number of times to slow down TOF captures.
+	// ran out of time to do a proper scheduler
 	uint64 wait;
 	for (wait = 0; wait < 100000000000000000000000uLL; wait++);
 	/* Create address for coordinator */
@@ -322,6 +315,16 @@ PRIVATE void task_StartTof(void)
 	}
 }
 
+/****************************************************************************
+ *
+ * NAME: task_CalculateDistance
+ *
+ * DESCRIPTION:
+ * Calculates the average i32TofDistance and the average u32RssiDistance 
+ *
+ * RETURNS: void
+ * 
+ ****************************************************************************/
 PRIVATE void task_CalculateDistance(void)
 {
 	int32 n, s32Mean, s32StanDev;
@@ -425,8 +428,8 @@ PRIVATE void task_CalculateDistance(void)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vProcessEventQueues(void)
 {
@@ -481,8 +484,8 @@ PRIVATE void vProcessEventQueues(void)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vProcessIncomingHwEvent(AppQApiHwInd_s *psAHI_Ind)
 {
@@ -501,8 +504,8 @@ PRIVATE void vProcessIncomingHwEvent(AppQApiHwInd_s *psAHI_Ind)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vProcessIncomingMlme(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
@@ -545,8 +548,8 @@ PRIVATE void vProcessIncomingMlme(MAC_MlmeDcfmInd_s *psMlmeInd)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vProcessIncomingMcps(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -578,7 +581,8 @@ PRIVATE void vProcessIncomingMcps(MAC_McpsDcfmInd_s *psMcpsInd)
  *
  * RETURNS:
  *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -602,7 +606,8 @@ PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd)
  *
  * RETURNS:
  *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -630,7 +635,8 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
  *
  * RETURNS:
  *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len)
 {
@@ -649,7 +655,7 @@ PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len)
  * RETURNS:
  * None.
  *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate
  * Assumes that a network has been found during the network scan.
  ****************************************************************************/
 PRIVATE void vStartAssociate(void)
@@ -694,8 +700,8 @@ PRIVATE void vStartAssociate(void)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vHandleAssociateResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
@@ -725,8 +731,8 @@ PRIVATE void vHandleAssociateResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
  * RETURNS:
  * None.
  *
- * NOTES:
- * updated 24_7_08, fixes not scanning high channels problem (sbarf)
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vStartActiveScan(uint32 u32ChannelstoScan)
 {
@@ -759,8 +765,8 @@ PRIVATE void vStartActiveScan(uint32 u32ChannelstoScan)
  * RETURNS:
  * None.
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate
+ * 
  ****************************************************************************/
 PRIVATE void vHandleActiveScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
@@ -802,6 +808,21 @@ PRIVATE void vHandleActiveScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
 
 }
 
+/****************************************************************************
+ *
+ * NAME: vPutChar
+ *
+ * DESCRIPTION:
+ * Updates the UART output presented to the user.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  c
+ *
+ * RETURNS: void
+ *
+ * NOTES: Demo Application Boiler Plate for supporting vPrintf functionality.
+ * 
+ ****************************************************************************/
 PRIVATE void vPutChar(unsigned char c) {
 	while ((u8AHI_UartReadLineStatus(UART) & E_AHI_UART_LS_THRE) == 0);
 	vAHI_UartWriteData(UART, c);
@@ -809,6 +830,16 @@ PRIVATE void vPutChar(unsigned char c) {
 }
 
 
+/****************************************************************************
+ *
+ * NAME: tx_Distance
+ *
+ * DESCRIPTION:
+ * Transmits the i32TofDistance and u32RssiDistance to the coordinator.
+ *
+ * RETURNS: void
+ * 
+ ****************************************************************************/
 PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance)
 {
 	/* Structures used to hold data for MLME request and response */
