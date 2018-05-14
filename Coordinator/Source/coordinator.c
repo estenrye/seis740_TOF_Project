@@ -1,39 +1,3 @@
-/****************************************************************************
- * $Rev::               $: Revision of last commit
- * $Author::            $: Author of last commit
- * $Date::              $: Date of last commit
- * $HeadURL$
- ****************************************************************************
- * This software is owned by Jennic and/or its supplier and is protected
- * under applicable copyright laws. All rights are reserved. We grant You,
- * and any third parties, a license to use this software solely and
- * exclusively on Jennic products. You, and any third parties must reproduce
- * the copyright and warranty notice and any other legend of ownership on each
- * copy or partial copy of the software.
- *
- * THIS SOFTWARE IS PROVIDED "AS IS". JENNIC MAKES NO WARRANTIES, WHETHER
- * EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE,
- * ACCURACY OR LACK OF NEGLIGENCE. JENNIC SHALL NOT, IN ANY CIRCUMSTANCES,
- * BE LIABLE FOR ANY DAMAGES, INCLUDING, BUT NOT LIMITED TO, SPECIAL,
- * INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON WHATSOEVER.
- *
- * Copyright Jennic Ltd 2009. All rights reserved
- ****************************************************************************/
-
-#define UART                    E_AHI_UART_0
-#define CACHED_AVERAGES         10
-#define BYTE_TO_BINARY_PATTERN  "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BINARY(byte)  \
-  (byte & 0x80 ? '1' : '0'), \
-  (byte & 0x40 ? '1' : '0'), \
-  (byte & 0x20 ? '1' : '0'), \
-  (byte & 0x10 ? '1' : '0'), \
-  (byte & 0x08 ? '1' : '0'), \
-  (byte & 0x04 ? '1' : '0'), \
-  (byte & 0x02 ? '1' : '0'), \
-  (byte & 0x01 ? '1' : '0') 
-
 /****************************************************************************/
 /***        Include files                                                 ***/
 /****************************************************************************/
@@ -49,12 +13,20 @@
 #include "Printf.h"
 #include <math.h>
 
-//#include "gdb.h"  // not reqd for x47 build
-
-
 /****************************************************************************/
 /***        Macro Definitions                                             ***/
 /****************************************************************************/
+#define UART                    E_AHI_UART_0
+#define BYTE_TO_BINARY_PATTERN  "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 
 /****************************************************************************/
 /***        Type Definitions                                              ***/
@@ -116,10 +88,6 @@ PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 
 PRIVATE void task_CalculateXYPos(void);
 
 /****************************************************************************/
-/***        Exported Variables                                            ***/
-/****************************************************************************/
-
-/****************************************************************************/
 /***        Local Variables                                               ***/
 /****************************************************************************/
 /* Handles from the MAC */
@@ -144,14 +112,17 @@ PRIVATE bool_t bLedState;
  * RETURNS:
  * Never returns.
  *
+ * NOTES: Demo Application Boiler Plate.
+ *        Modified to call custom code.
+ * 
  ****************************************************************************/
 PUBLIC void AppColdStart(void)
 {
     volatile int n=0;
 
-#ifdef WATCHDOG_ENABLED
-    vAHI_WatchdogStop();
-#endif
+    #ifdef WATCHDOG_ENABLED
+        vAHI_WatchdogStop();
+    #endif
 
     vAHI_UartEnable(UART);
     vAHI_UartReset(UART, TRUE, TRUE);
@@ -192,6 +163,8 @@ PUBLIC void AppColdStart(void)
  * RETURNS:
  * Never returns.
  *
+ * NOTES: Demo Application Boiler Plate.
+ * 
  ****************************************************************************/
 PUBLIC void AppWarmStart(void)
 {
@@ -207,19 +180,20 @@ PUBLIC void AppWarmStart(void)
  * NAME: vInitSystem
  *
  * DESCRIPTION:
- *
+ *   Initializes hardware and initial data values.
+ * 
  * RETURNS:
  * void
  *
+ * NOTES: Demo Application Boiler Plate for system initialization.
+ *        Modified to initialize new data added to the application.
+ * 
  ****************************************************************************/
 PRIVATE void vInitSystem(void)
 {
     /* Setup interface to MAC */
     (void)u32AppQApiInit(NULL, NULL, NULL);
     (void)u32AHI_Init();
-
-	/* Enable high power modules */
-	//vAHI_HighPowerModuleEnable(TRUE, TRUE);
 
     /* Initialise coordinator state */
     sCoordinatorData.eState = E_STATE_IDLE;
@@ -258,13 +232,12 @@ PRIVATE void vInitSystem(void)
  * Check each of the three event queues and process and items found.
  *
  * PARAMETERS:      Name            RW  Usage
- * None.
+ * void
  *
- * RETURNS:
- * None.
- *
- * NOTES:
- * None.
+ * RETURNS: void
+ * 
+ * NOTES: Demo Application Boiler Plate for handling event queues.
+ * 
  ****************************************************************************/
 PRIVATE void vProcessEventQueues(void)
 {
@@ -316,11 +289,10 @@ PRIVATE void vProcessEventQueues(void)
  * PARAMETERS:      Name            RW  Usage
  *                  psMlmeInd
  *
- * RETURNS:
- * None.
+ * RETURNS: void
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate for handling incoming 802.15.4 
+ *        managment events.
  ****************************************************************************/
 PRIVATE void vProcessIncomingMlme(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
@@ -359,11 +331,10 @@ PRIVATE void vProcessIncomingMlme(MAC_MlmeDcfmInd_s *psMlmeInd)
  * PARAMETERS:      Name            RW  Usage
  *                  psMcpsInd
  *
- * RETURNS:
- * None.
- *
- * NOTES:
- * None.
+ * RETURNS: void
+ * 
+ * NOTES: Demo Application Boiler Plate for handling incoming 802.15.4 data.
+ * 
  ****************************************************************************/
 PRIVATE void vProcessIncomingMcps(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -392,10 +363,13 @@ PRIVATE void vProcessIncomingMcps(MAC_McpsDcfmInd_s *psMcpsInd)
  * DESCRIPTION:
  *
  * PARAMETERS:      Name            RW  Usage
+ *                  psMcpsInd
+ * 
+ * RETURNS: void
  *
- * RETURNS:
- *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate for handling 802.15.4 Data
+ *        Acknowledgements.
+ * 
  ****************************************************************************/
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -416,10 +390,11 @@ PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd)
  * DESCRIPTION:
  *
  * PARAMETERS:      Name            RW  Usage
- *
+ *                  psMcpsInd
  * RETURNS:
  *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate for handling 802.15.4 Received Data 
+ *        Packet Events.
  ****************************************************************************/
 PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
 {
@@ -447,10 +422,13 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd)
  * DESCRIPTION:
  *
  * PARAMETERS:      Name            RW  Usage
+ *                  pu8Data             Packet Data Received
+ *                  u8Len               Size of Data Array.
+ *                  u16Address          Source Address
+ * RETURNS: void
  *
- * RETURNS:
- *
- * NOTES:
+ * NOTES: Demo Application Boiler Plate for handling Received data packets.
+ *        Modified to call custom data handler.
  ****************************************************************************/
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16Address)
 {
@@ -470,9 +448,22 @@ PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len, uint16 u16A
     }
 }
 
+/****************************************************************************
+ *
+ * NAME: interrupt_handleDistanceTransmissionReceived
+ *
+ * DESCRIPTION:
+ *     Data handler for Distance Transmission Received Event.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  pu8Data             Packet Data Received
+ *                  u8Len               Size of Data Array.
+ *                  u16Address          Source Address
+ * RETURNS: void
+ *
+ ****************************************************************************/
 PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 u8Len, uint16 u16Address)
 {
-    vPrintf("\nDistance Transmission Received From Beacon %i.\n", u16Address);
     #ifdef DEBUG_DISTANCE_TRANSMISSION
         vPrintf("TOF  Byte0: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[0]));
         vPrintf("TOF  Byte1: "BYTE_TO_BINARY_PATTERN"\n", BYTE_TO_BINARY(pu8Data[1]));
@@ -499,8 +490,7 @@ PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 
 
     sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32RssiDistance = highByte | midHighByte | midLowByte | lowByte;
 
-    vPrintf("TOF Distance: %i cm", sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].i32TofDistance);
-    vPrintf("RSSI Distance: %i cm", sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32RssiDistance);
+    vPrintf("\nDistance Transmission Received From Beacon %i.\nTOF Distance: %i cm\nRSSI Distance: %i cm\n", u16Address, sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].i32TofDistance, sCoordinatorData.sEndDeviceData[u16EndDeviceIndex].u32RssiDistance);
 }
 
 /****************************************************************************
@@ -513,11 +503,8 @@ PRIVATE void interrupt_handleDistanceTransmissionReceived(uint8 *pu8Data, uint8 
  * PARAMETERS:      Name            RW  Usage
  *                  psAHI_Ind
  *
- * RETURNS:
- * None.
- *
- * NOTES:
- * None.
+ * RETURNS: void
+ * 
  ****************************************************************************/
 PRIVATE void vProcessIncomingHwEvent(AppQApiHwInd_s *psAHI_Ind)
 {
@@ -533,11 +520,11 @@ PRIVATE void vProcessIncomingHwEvent(AppQApiHwInd_s *psAHI_Ind)
  * PARAMETERS:      Name            RW  Usage
  *                  psMlmeInd
  *
- * RETURNS:
- * None.
- *
- * NOTES:
- * None.
+ * RETURNS: void
+ * 
+ * NOTES: Demo Application Boiler Plate for handling Node Association.
+ *        Modified to set additional value for display purposes.
+ * 
  ****************************************************************************/
 PRIVATE void vHandleNodeAssociation(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
@@ -591,17 +578,16 @@ PRIVATE void vHandleNodeAssociation(MAC_MlmeDcfmInd_s *psMlmeInd)
  * NAME: vStartEnergyScan
  *
  * DESCRIPTION:
- * Starts an enery sacn on the channels specified.
+ * Starts an enery scan on the channels specified.
  *
  * PARAMETERS:      Name            RW  Usage
  * None.
  *
- * RETURNS:
- * None.
+ * RETURNS: void
  *
- * NOTES:
- * None.
- ****************************************************************************/
+ * NOTES: Demo Application Boiler Plate for handling 802.15.4 Energy Scans.
+ * 
+ *****************************************************************************/
 PRIVATE void vStartEnergyScan(void)
 {
     /* Structures used to hold data for MLME request and response */
@@ -631,30 +617,31 @@ PRIVATE void vStartEnergyScan(void)
  * PARAMETERS:      Name            RW  Usage
  * None.
  *
- * RETURNS:
- * None.
+ * RETURNS: void
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate for handling 802.15.4 Energy Scan
+ *        Response.
+ * 
  ****************************************************************************/
 PRIVATE void vHandleEnergyScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
 {
     uint8 u8MinEnergy;
-
+    uint8 i;
 	u8MinEnergy = (psMlmeInd->uParam.sDcfmScan.uList.au8EnergyDetect[0]) ;
 
     sCoordinatorData.u8Channel = CHANNEL_MIN;
 
 	/* Search list to find quietest channel */
-    //while (i < psMlmeInd->uParam.sDcfmScan.u8ResultListSize)
-    //{
-    //    if ((psMlmeInd->uParam.sDcfmScan.uList.au8EnergyDetect[i]) < u8MinEnergy)
-    //    {
-	//		u8MinEnergy = (psMlmeInd->uParam.sDcfmScan.uList.au8EnergyDetect[i]);
-	//		sCoordinatorData.u8Channel = i + CHANNEL_MIN;
-	//	}
-	//	i++;
-    //}
+    while (i < psMlmeInd->uParam.sDcfmScan.u8ResultListSize)
+    {
+       if ((psMlmeInd->uParam.sDcfmScan.uList.au8EnergyDetect[i]) < u8MinEnergy)
+       {
+			u8MinEnergy = (psMlmeInd->uParam.sDcfmScan.uList.au8EnergyDetect[i]);
+			sCoordinatorData.u8Channel = i + CHANNEL_MIN;
+		}
+		i++;
+    }
+
     vStartCoordinator();
 }
 
@@ -672,8 +659,8 @@ PRIVATE void vHandleEnergyScanResponse(MAC_MlmeDcfmInd_s *psMlmeInd)
  * RETURNS:
  * TRUE if network was started successfully otherwise FALSE
  *
- * NOTES:
- * None.
+ * NOTES: Demo Application Boiler Plate for starting 802.15.4 Network.
+ * 
  ****************************************************************************/
 PRIVATE void vStartCoordinator(void)
 {
@@ -698,6 +685,19 @@ PRIVATE void vStartCoordinator(void)
     vAppApiMlmeRequest(&sMlmeReqRsp, &sMlmeSyncCfm);
 }
 
+/****************************************************************************
+ *
+ * NAME: lcd_BuildStatusScreen
+ *
+ * DESCRIPTION:
+ * Builds the LCD output presented to the user.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ * None.
+ *
+ * RETURNS: void
+ *
+ ****************************************************************************/
 PRIVATE void lcd_BuildStatusScreen(void)
 {
     #ifdef DEBUG_LCD
@@ -719,6 +719,20 @@ PRIVATE void lcd_BuildStatusScreen(void)
     lcd_UpdateStatusScreen();
 }
 
+/****************************************************************************
+ *
+ * NAME: GetDistance
+ *
+ * DESCRIPTION:
+ * Retrieves a distance measurement for a specified end device.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  iEndDevice          index of the end device in the routing table to use.
+ *
+ * RETURNS: uint32 distance result.
+ *
+ ****************************************************************************/
+
 PRIVATE uint32 GetDistance(uint16 iEndDevice)
 {
     uint32 distance;
@@ -734,6 +748,19 @@ PRIVATE uint32 GetDistance(uint16 iEndDevice)
     return distance;
 }
 
+/****************************************************************************
+ *
+ * NAME: lcd_UpdateStatusScreen
+ *
+ * DESCRIPTION:
+ * Updates the LCD output presented to the user.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ * None.
+ *
+ * RETURNS: void
+ *
+ ****************************************************************************/
 PRIVATE void lcd_UpdateStatusScreen(void)
 {
     #ifdef DEBUG_LCD
@@ -779,14 +806,43 @@ PRIVATE void lcd_UpdateStatusScreen(void)
     vLcdRefreshAll();
 }
 
+/****************************************************************************
+ *
+ * NAME: vPutChar
+ *
+ * DESCRIPTION:
+ * Updates the UART output presented to the user.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  c
+ *
+ * RETURNS: void
+ *
+ * NOTES: Demo Application Boiler Plate for supporting vPrintf functionality.
+ * 
+ ****************************************************************************/
 PRIVATE void vPutChar(unsigned char c) {
 	while ((u8AHI_UartReadLineStatus(UART) & E_AHI_UART_LS_THRE) == 0);
 	vAHI_UartWriteData(UART, c);
     while ((u8AHI_UartReadLineStatus(UART) & (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT)) != (E_AHI_UART_LS_THRE | E_AHI_UART_LS_TEMT));
 }
 
-// reverses a string 'str' of length 'len'
-// retrieved from: https://www.geeksforgeeks.org/convert-floating-point-number-string/
+/****************************************************************************
+ *
+ * NAME: vPutChar
+ *
+ * DESCRIPTION:
+ * reverses a string 'str' of length 'len'
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  str             Y   string to reverse
+ *                  len             N   length of the string.
+ *
+ * RETURNS: void
+ *
+ * NOTES: retrieved from https://www.geeksforgeeks.org/convert-floating-point-number-string/
+ * 
+ ****************************************************************************/
 void reverse(char *str, int len)
 {
     int i=0, j=len-1, temp;
@@ -799,11 +855,26 @@ void reverse(char *str, int len)
     }
 }
  
- // Converts a given integer x to string str[].  d is the number
- // of digits required in output. If d is more than the number
- // of digits in x, then 0s are added at the beginning.
- // retrieved from https://www.geeksforgeeks.org/convert-floating-point-number-string/
- // modified to support uint32 numbers.
+/****************************************************************************
+ *
+ * NAME: vPutChar
+ *
+ * DESCRIPTION:
+ * Converts a given positive integer x to string str[].  d is the number
+ * of digits required in output. If d is more than the number
+ * of digits in x, then 0s are added at the beginning.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ *                  uint32          N   integer to convert.
+ *                  str             Y   string to write result to
+ *                  len             N   number of leading zeros.
+ *
+ * RETURNS: void
+ *
+ * NOTES: retrieved from https://www.geeksforgeeks.org/convert-floating-point-number-string/
+ *        modified to support uint32 numbers.
+ * 
+ ****************************************************************************/
 int intToStr(uint32 x, char str[], int d)
 {
     int i = 0;
@@ -825,12 +896,26 @@ int intToStr(uint32 x, char str[], int d)
     return i;
 }
 
+/****************************************************************************
+ *
+ * NAME: vPutChar
+ *
+ * DESCRIPTION:
+ * Calculates the XY position of the coordinator based on time of flight data
+ * received from beacon nodes.
+ *
+ * PARAMETERS:      Name            RW  Usage
+ * None.
+ *
+ * RETURNS: void
+ *
+ ****************************************************************************/
 PRIVATE void task_CalculateXYPos(void)
 {
     int32 a = (int32)GetDistance(0);
     int32 b = (int32)GetDistance(1);
     int32 c = (int32)120;
-    vPrintf("Calculate XY Position\nA: %i\nB: %i\nC: %i\n", a, b, c);
+    vPrintf("\nCalculate XY Position\nA: %i\nB: %i\nC: %i\n", a, b, c);
     if (a > 0 && b > 0)
     {
         int32 s = (a + b + c) / 2;
