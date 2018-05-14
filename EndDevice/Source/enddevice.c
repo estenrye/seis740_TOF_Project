@@ -302,6 +302,8 @@ PRIVATE void vInitSystem(void)
 
 PRIVATE void task_StartTof(void)
 {
+	uint64 wait;
+	for (wait = 0; wait < 100000000000000000000000uLL; wait++);
 	/* Create address for coordinator */
 	MAC_Addr_s sAddr;
 	sAddr.u8AddrMode     = 2;
