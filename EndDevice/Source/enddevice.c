@@ -71,6 +71,8 @@ typedef struct
 	uint8   u8TxPacketSeqNb;
 	uint8   u8RxPacketSeqNb;
 	uint16  u16Address;
+	int32   i32TofDistance;
+	uint32  u32RssiDistance;
 } tsEndDeviceData;
 
 /****************************************************************************/
@@ -89,6 +91,9 @@ PRIVATE void vHandleMcpsDataInd(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vHandleMcpsDataDcfm(MAC_McpsDcfmInd_s *psMcpsInd);
 PRIVATE void vProcessReceivedDataPacket(uint8 *pu8Data, uint8 u8Len);
 PRIVATE void vPutChar(unsigned char c);
+
+PRIVATE void task_StartTof(void);
+PRIVATE void task_CalculateDistance(void);
 PRIVATE void tx_Distance(int32 i32TofDistance, uint32 u32RssiDistance);
 
 /****************************************************************************/
@@ -161,11 +166,6 @@ void vTofCallback(eTofReturn eStatus)
 PUBLIC void AppColdStart(void)
 {
 	int n;
-	bool_t  bTofDirection = API_TOF_FORWARDS;
-	int32 s32Mean, s32StanDev, i32TofDistance;
-	uint32 u32RssiDistance;
-	double dStd, dMean;
-	uint8  u8NumErrors, u8NumSuccessfullTofs=0;
 
 #ifdef WATCHDOG_ENABLED
 	vAHI_WatchdogStop();
@@ -200,12 +200,6 @@ PUBLIC void AppColdStart(void)
 	vPrintf("Starting Scan\n");
 	vStartActiveScan(SCAN_CHANNELS);
 
-	/* Create address for coordinator */
-	MAC_Addr_s sAddr;
-	sAddr.u8AddrMode     = 2;
-	sAddr.u16PanId       = PAN_ID;
-	sAddr.uAddr.u16Short = COORDINATOR_ADR;
-
 	vLedInitRfd();
 
 	while (1)
@@ -219,108 +213,15 @@ PUBLIC void AppColdStart(void)
 
 		if (sEndDeviceData.eState >= E_STATE_ASSOCIATED)
 		{
-			if(bTofInProgress==FALSE)
-			{
-				if (bAppApiGetTof( asTofData, &sAddr, MAX_READINGS, API_TOF_FORWARDS, vTofCallback))
-				{
-					vPrintf("\nForward burst started");
-					bTofInProgress = TRUE;
-					bTofDirection = API_TOF_FORWARDS;
-				} else {
-					vPrintf("\nFailed to start ToF");
-				}
-			}
+			task_StartTof();
 
 			/* Check for return code to have been set in callback */
 			if (eTofStatus != -1)
 			{
 				if (eTofStatus == TOF_SUCCESS)
 				{
-					u8NumSuccessfullTofs++;
-
-					double dAcc = 0.0;
-					u32RssiDistance = 0;
-
-					u8NumErrors = 0;
-
-					vPrintf("\n\n| #  \x1BH| ToF (ps) \x1BH| Lcl RSSI \x1BH| Lcl SQI \x1BH| Rmt RSSI \x1BH| Rmt SQI \x1BH| Timestamp \x1BH| Status \x1BH|");
-					vPrintf("\n--------------------------------------------------------------------------------");
-
-					for(n = 0; n < MAX_READINGS; n++)
-					{
-						vPrintf("\n|%d",n);
-
-						/* Only include successful readings */
-						if (asTofData[n].u8Status == MAC_TOF_STATUS_SUCCESS)
-						{
-							dAcc += asTofData[n].s32Tof;
-							u32RssiDistance += au32RSSIdistance[asTofData[n].s8LocalRSSI];
-							u32RssiDistance += au32RSSIdistance[asTofData[n].s8RemoteRSSI];
-
-							vPrintf("\t|%i\t|%d\t|%d\t|%d\t|%d\t|%d\t|%d\t|",
-									asTofData[n].s32Tof,
-									asTofData[n].s8LocalRSSI,
-									asTofData[n].u8LocalSQI,
-									asTofData[n].s8RemoteRSSI,
-									asTofData[n].u8RemoteSQI,
-									asTofData[n].u32Timestamp,
-									asTofData[n].u8Status);
-						}
-						else
-						{
-							u8NumErrors++;
-
-							vPrintf("\t|-\t|-\t|-\t|-\t|-\t|-\t|%d\t|",
-									asTofData[n].u8Status);
-						}
-					}
-
-					/* Calculate statistics */
-					if(u8NumErrors != MAX_READINGS)
-					{
-						dMean = dAcc / (MAX_READINGS - u8NumErrors);
-
-						/* Calculate standard deviation = sqrt((1/N)*(sigma(xi-xmean)2) */
-						dStd = 0.0;
-
-						/* Accumulate sum of squared deviances */
-						for(n = 0; n < MAX_READINGS; n++)
-						{
-							if(asTofData[n].u8Status == MAC_TOF_STATUS_SUCCESS)
-							{
-								dStd += ((double)asTofData[n].s32Tof - dMean) * ((double)asTofData[n].s32Tof - dMean);
-							}
-						}
-
-						/* std = sqrt(mean of sum of squared deviances) */
-						dStd /= (MAX_READINGS - u8NumErrors);
-						dStd = sqrt(dStd);
-
-
-						s32StanDev = (int32)dStd;
-						s32Mean    = (int32)dMean;
-
-						/* Calculate distances */
-						i32TofDistance  = dMean * 0.03;
-						u32RssiDistance /= (MAX_READINGS - u8NumErrors) * 2;
-					}
-					else
-					{
-						s32StanDev      = 0;
-						s32Mean         = 0;
-						i32TofDistance  = 0;
-						u32RssiDistance = 0;
-					}
-
-					vPrintf("\n\nStandDev (ToF): %ips, Mean (ToF): %ips, Errors: %d",
-							s32StanDev,
-							s32Mean,
-							u8NumErrors);
-
-					vPrintf("\nDistance (ToF): %icm, Distance (RSSI): %dcm",
-							i32TofDistance,
-							u32RssiDistance);
-					tx_Distance(i32TofDistance, u32RssiDistance);
+					task_CalculateDistance();
+					tx_Distance(sEndDeviceData.i32TofDistance, sEndDeviceData.u32RssiDistance);
 				}
 				else
 				{
@@ -398,6 +299,117 @@ PRIVATE void vInitSystem(void)
 
 	vPrintf("Done Init\n");
 }
+
+PRIVATE void task_StartTof(void)
+{
+	/* Create address for coordinator */
+	MAC_Addr_s sAddr;
+	sAddr.u8AddrMode     = 2;
+	sAddr.u16PanId       = PAN_ID;
+	sAddr.uAddr.u16Short = COORDINATOR_ADR;
+
+	if(bTofInProgress==FALSE)
+	{
+		if (bAppApiGetTof( asTofData, &sAddr, MAX_READINGS, API_TOF_FORWARDS, vTofCallback))
+		{
+			vPrintf("\nForward burst started");
+			bTofInProgress = TRUE;
+		} else {
+			vPrintf("\nFailed to start ToF");
+		}
+	}
+}
+
+PRIVATE void task_CalculateDistance(void)
+{
+	int32 n, s32Mean, s32StanDev;
+	double dStd, dMean;
+	uint8  u8NumErrors;
+
+	double dAcc = 0.0;
+	sEndDeviceData.u32RssiDistance = 0;
+
+	u8NumErrors = 0;
+
+	vPrintf("\n\n| #  \x1BH| ToF (ps) \x1BH| Lcl RSSI \x1BH| Lcl SQI \x1BH| Rmt RSSI \x1BH| Rmt SQI \x1BH| Timestamp \x1BH| Status \x1BH|");
+	vPrintf("\n--------------------------------------------------------------------------------");
+
+	for(n = 0; n < MAX_READINGS; n++)
+	{
+		vPrintf("\n|%d",n);
+
+		/* Only include successful readings */
+		if (asTofData[n].u8Status == MAC_TOF_STATUS_SUCCESS)
+		{
+			dAcc += asTofData[n].s32Tof;
+			sEndDeviceData.u32RssiDistance += au32RSSIdistance[asTofData[n].s8LocalRSSI];
+			sEndDeviceData.u32RssiDistance += au32RSSIdistance[asTofData[n].s8RemoteRSSI];
+
+			vPrintf("\t|%i\t|%d\t|%d\t|%d\t|%d\t|%d\t|%d\t|",
+					asTofData[n].s32Tof,
+					asTofData[n].s8LocalRSSI,
+					asTofData[n].u8LocalSQI,
+					asTofData[n].s8RemoteRSSI,
+					asTofData[n].u8RemoteSQI,
+					asTofData[n].u32Timestamp,
+					asTofData[n].u8Status);
+		}
+		else
+		{
+			u8NumErrors++;
+
+			vPrintf("\t|-\t|-\t|-\t|-\t|-\t|-\t|%d\t|",
+					asTofData[n].u8Status);
+		}
+	}
+
+	/* Calculate statistics */
+	if(u8NumErrors != MAX_READINGS)
+	{
+		dMean = dAcc / (MAX_READINGS - u8NumErrors);
+
+		/* Calculate standard deviation = sqrt((1/N)*(sigma(xi-xmean)2) */
+		dStd = 0.0;
+
+		/* Accumulate sum of squared deviances */
+		for(n = 0; n < MAX_READINGS; n++)
+		{
+			if(asTofData[n].u8Status == MAC_TOF_STATUS_SUCCESS)
+			{
+				dStd += ((double)asTofData[n].s32Tof - dMean) * ((double)asTofData[n].s32Tof - dMean);
+			}
+		}
+
+		/* std = sqrt(mean of sum of squared deviances) */
+		dStd /= (MAX_READINGS - u8NumErrors);
+		dStd = sqrt(dStd);
+
+
+		s32StanDev = (int32)dStd;
+		s32Mean    = (int32)dMean;
+
+		/* Calculate distances */
+		sEndDeviceData.i32TofDistance  = dMean * 0.03;
+		sEndDeviceData.u32RssiDistance /= (MAX_READINGS - u8NumErrors) * 2;
+	}
+	else
+	{
+		s32StanDev      = 0;
+		s32Mean         = 0;
+		sEndDeviceData.i32TofDistance  = 0;
+		sEndDeviceData.u32RssiDistance = 0;
+	}
+
+	vPrintf("\n\nStandDev (ToF): %ips, Mean (ToF): %ips, Errors: %d",
+			s32StanDev,
+			s32Mean,
+			u8NumErrors);
+
+	vPrintf("\nDistance (ToF): %icm, Distance (RSSI): %dcm",
+			sEndDeviceData.i32TofDistance,
+			sEndDeviceData.u32RssiDistance);
+}
+
 /****************************************************************************
  *
  * NAME: vProcessEventQueues

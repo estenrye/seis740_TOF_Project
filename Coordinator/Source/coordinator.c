@@ -722,7 +722,7 @@ PRIVATE void lcd_BuildStatusScreen(void)
 PRIVATE uint32 GetDistance(uint16 iEndDevice)
 {
     uint32 distance;
-    if (sCoordinatorData.sEndDeviceData[iEndDevice].i32TofDistance < 500)
+    if (sCoordinatorData.sEndDeviceData[iEndDevice].i32TofDistance < 50)
     
     {
         distance = sCoordinatorData.sEndDeviceData[iEndDevice].u32RssiDistance;
